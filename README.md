@@ -36,7 +36,7 @@ Built from [`cannonball-simulator-spec.md`](cannonball-simulator-spec.md), scope
 | Preset               | Model                               | Historical                    |
 | -------------------- | ----------------------------------- | ----------------------------- |
 | Napoleon 12-pdr @ 5° | 440 m/s · 1.7 km                    | ≈440 m/s · ≈1.5 km            |
-| M777 @ 45°           | 821 m/s · 24.7 km                   | ≈827 m/s · ≈24 km             |
+| M777 @ 45°           | 821 m/s · 24.9 km                   | ≈827 m/s · ≈24 km             |
 | Paris Gun @ 52°      | 1,596 m/s · 125 km · apogee 42.5 km | ≈1,640 m/s · ≈130 km · ≈42 km |
 
 Drag coefficients are flat (no Mach-dependent G1/G7 tables yet), so treat these as sanity checks rather than firing tables.

@@ -52,10 +52,26 @@ export function saturationVapourPressure(temperatureK: number): number {
  * intuition, and a nice thing to surface in the readouts.
  */
 export function moistAirDensity(temperatureK: number, pressurePa: number, humidity: number) {
-  const pv = clamp(humidity, 0, 1) * saturationVapourPressure(temperatureK)
-  const pd = Math.max(pressurePa - pv, 0)
-  return pd / (R_DRY_AIR * temperatureK) + pv / (R_WATER_VAPOUR * temperatureK)
+  return densityWithVapour(
+    temperatureK,
+    pressurePa,
+    clamp(humidity, 0, 1) * saturationVapourPressure(temperatureK),
+  )
 }
+
+/**
+ * Ideal-gas density of a dry-air + water-vapour mixture at a given vapour partial
+ * pressure. Vapour is capped at the total pressure so thin air can never come out
+ * as "all vapour", which used to pin density at a constant floor high up.
+ */
+export function densityWithVapour(temperatureK: number, pressurePa: number, vapourPa: number) {
+  const p = Math.max(pressurePa, 0)
+  const pv = clamp(vapourPa, 0, p)
+  return (p - pv) / (R_DRY_AIR * temperatureK) + pv / (R_WATER_VAPOUR * temperatureK)
+}
+
+/** Water-vapour scale height, m: most of the atmosphere's water sits in the lowest few km. */
+const VAPOUR_SCALE_HEIGHT = 2000
 
 /** Speed of sound in dry-ish air, m/s. */
 export function speedOfSound(temperatureK: number): number {
@@ -63,7 +79,7 @@ export function speedOfSound(temperatureK: number): number {
 }
 
 /**
- * International Standard Atmosphere layers up to 51 km: base geopotential altitude
+ * International Standard Atmosphere layers up to 86 km: base geopotential altitude
  * (m), base temperature (K), base pressure (Pa) and lapse rate (K/m, positive = warming).
  */
 const ISA_LAYERS = [
@@ -78,9 +94,27 @@ const ISA_LAYERS = [
 
 const G0 = 9.80665
 
-/** ISA temperature (K) and pressure (Pa) at a geopotential altitude. */
+/** Top of the tabulated ISA, m. */
+const ISA_TOP = 86000
+
+/**
+ * ISA temperature (K) and pressure (Pa) at a geopotential altitude.
+ *
+ * Above the 86 km table top the profile continues isothermally, so pressure keeps
+ * decaying exponentially. (It used to clamp, freezing density at its 86 km value
+ * and applying phantom drag to shots in space.) The real thermosphere is warmer
+ * and somewhat denser than this, but at those densities drag is negligible either way.
+ */
 export function isa(altitude: number): { temperature: number; pressure: number } {
-  const h = Math.min(Math.max(altitude, -5000), 86000)
+  if (altitude > ISA_TOP) {
+    const top = isa(ISA_TOP)
+    return {
+      temperature: top.temperature,
+      pressure:
+        top.pressure * Math.exp((-G0 * (altitude - ISA_TOP)) / (R_DRY_AIR * top.temperature)),
+    }
+  }
+  const h = Math.max(altitude, -5000)
   let layer: (typeof ISA_LAYERS)[number] = ISA_LAYERS[0]
   for (const l of ISA_LAYERS) if (h >= l.base) layer = l
   const dh = h - layer.base
@@ -127,9 +161,19 @@ export function airStateAt(config: AtmosphereConfig, y: number): AirState {
   const temperature = Math.max(here.temperature + deltaT, 120)
   const pressure = here.pressure * pressureRatio
 
+  // Humidity is measured at the launch site. Holding that relative humidity at every
+  // altitude would put ground-level moisture in the stratosphere, so instead start from
+  // the launch-site vapour pressure, fade it with height, and never exceed saturation.
+  const launchT = config.temperatureC + CELSIUS_TO_KELVIN
+  const launchVapour = clamp(config.humidity, 0, 1) * saturationVapourPressure(launchT)
+  const vapour = Math.min(
+    launchVapour * Math.exp(-Math.max(y, 0) / VAPOUR_SCALE_HEIGHT),
+    saturationVapourPressure(temperature),
+  )
+
   return {
     altitudeASL,
-    density: moistAirDensity(temperature, pressure, config.humidity),
+    density: densityWithVapour(temperature, pressure, vapour),
     temperature,
     pressure,
     speedOfSound: speedOfSound(temperature),

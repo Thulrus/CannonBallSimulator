@@ -443,6 +443,7 @@ export function ControlPanel({ config, onChange, units, result }: Props) {
         />
         <Slider
           label="Max flight time"
+          hint="Safety cap on simulated time. Long flights are automatically allowed up to 2.5× their vacuum flight time (at most one hour)."
           value={integration.maxFlightTime}
           onChange={(v) => set('integration', { maxFlightTime: v })}
           min={10}

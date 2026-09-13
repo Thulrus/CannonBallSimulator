@@ -109,6 +109,8 @@ export interface ImpactInfo {
   angle: number
   /** Straight-line ground distance from the muzzle, m. */
   groundDistance: number
+  /** True when the flight-time limit ran out before the shot reached the ground. */
+  truncated: boolean
 }
 
 export interface Apogee {
@@ -177,6 +179,9 @@ export function buildWorld(config: SimulationConfig): WorldConfig {
   }
 }
 
+/** Hard ceiling on the automatically extended flight-time limit, s. */
+export const AUTO_FLIGHT_TIME_CAP = 3600
+
 /** Initial velocity vector at muzzle exit, m/s. */
 export function launchVelocity(speed: number, elevationDeg: number): Vec3 {
   const el = elevationDeg * DEG
@@ -218,7 +223,15 @@ export function simulate(config: SimulationConfig): SimulationResult {
   }
 
   const dt = clamp(config.integration.timestep, 1e-5, 0.05)
-  const maxT = config.integration.maxFlightTime
+  // The configured limit is a floor, not a trap. A light shell on a big charge can
+  // legitimately stay up for many minutes, and cutting it off mid-air used to report
+  // the cut-off point as the "impact". Allow at least 2.5× the vacuum flight time —
+  // drag almost always shortens a flight — up to a hard safety cap.
+  const vacuum = vacuumReference(muzzle.velocity, config.cannon.elevation, world.gravity)
+  const maxT = Math.max(
+    config.integration.maxFlightTime,
+    Math.min(vacuum.timeOfFlight * 2.5, AUTO_FLIGHT_TIME_CAP),
+  )
   const sampleInterval = Math.max(config.integration.sampleInterval, dt)
 
   let state: State = {
@@ -264,6 +277,7 @@ export function simulate(config: SimulationConfig): SimulationResult {
             180) /
           Math.PI,
         groundDistance: Math.hypot(hitState.position.x, hitState.position.z),
+        truncated: false,
       }
       break
     }
@@ -278,7 +292,7 @@ export function simulate(config: SimulationConfig): SimulationResult {
 
   if (!impact) {
     warnings.push(
-      `Flight did not reach the ground within the ${maxT}s limit — results are truncated.`,
+      `Still airborne after ${Math.round(maxT)} s, so there is no impact point. Raise Max flight time under Integration to follow it down.`,
     )
     const last = samples[samples.length - 1]
     impact = {
@@ -290,15 +304,25 @@ export function simulate(config: SimulationConfig): SimulationResult {
         (Math.atan2(-last.velocity.y, Math.hypot(last.velocity.x, last.velocity.z)) * 180) /
         Math.PI,
       groundDistance: Math.hypot(last.position.x, last.position.z),
+      truncated: true,
     }
   }
 
   if (muzzle.velocity === 0) {
     warnings.push('No propellant energy delivered — increase the charge mass or barrel length.')
   }
+  if (muzzle.velocity > 2500) {
+    warnings.push(
+      `A muzzle velocity of ${Math.round(muzzle.velocity)} m/s is beyond any real powder gun (about 2 km/s). The energy model has no gas-expansion limit, so treat this as a thought experiment.`,
+    )
+  }
 
   const apogee = findApogee(samples)
-  const vacuum = vacuumReference(muzzle.velocity, config.cannon.elevation, world.gravity)
+  if (apogee.altitude > 100_000 || impact.groundDistance > 500_000) {
+    warnings.push(
+      'This shot is outside the flat-Earth, constant-gravity model: above ~100 km or beyond a few hundred km of range, the real Earth curves away beneath it and gravity weakens.',
+    )
+  }
 
   const launchKE = samples[0].energy.kinetic
   const impactSample = samples[samples.length - 1]

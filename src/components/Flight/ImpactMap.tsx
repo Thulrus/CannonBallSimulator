@@ -25,6 +25,23 @@ export function ImpactMap({ result, aim, shots, units }: Props) {
   const dx = result.impact.position.x - ax
   const dz = result.impact.position.z - az
 
+  if (result.impact.truncated || aim?.impact.truncated) {
+    return (
+      <div className="panel-card flex flex-col p-3">
+        <h3 className="text-[10.5px] font-medium tracking-[0.12em] text-ink-400 uppercase">
+          Impact map
+        </h3>
+        <div className="flex flex-col items-center gap-1 px-2 py-10 text-center">
+          <p className="text-[13px] font-medium text-amber-200">No impact yet</p>
+          <p className="text-[11.5px] leading-snug text-ink-400">
+            The shot was still airborne when the flight-time limit ran out. Raise Max flight time
+            under Integration to follow it down.
+          </p>
+        </div>
+      </div>
+    )
+  }
+
   // Pick a round ring spacing in *display* units (50 yd, not 45.72 m), then convert back.
   const unit = displayUnit(units, 'distance', Math.hypot(dx, dz) * 4)
   const ringDisplay = niceStep(Math.max(Math.hypot(dx, dz) * 1.15, 4) * unit.factor, 3)

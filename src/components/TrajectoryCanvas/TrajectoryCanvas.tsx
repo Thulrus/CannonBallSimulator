@@ -56,7 +56,13 @@ export function TrajectoryCanvas({ result, shots, options }: Props) {
         prevTime = 0
       }
       const impactT = result.impact.time
-      if (wasPlaying && pb.duration === prevDuration && prevTime < impactT && pb.time >= impactT) {
+      if (
+        !result.impact.truncated &&
+        wasPlaying &&
+        pb.duration === prevDuration &&
+        prevTime < impactT &&
+        pb.time >= impactT
+      ) {
         particles.emitImpact(geo.impact.x, geo.impact.y)
       }
       prevTime = pb.time

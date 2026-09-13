@@ -36,6 +36,7 @@ export interface SceneGeometry {
 
 const MARGIN = { left: 60, right: 18, top: 18, bottom: 36 }
 const MAX_PATH_POINTS = 1600
+const TRUNCATED_COLOR = '#fbbf24'
 const FONT = '500 10.5px "Inter Variable", ui-sans-serif, system-ui, sans-serif'
 const FONT_BOLD = '600 11px "Inter Variable", ui-sans-serif, system-ui, sans-serif'
 
@@ -489,6 +490,30 @@ function drawImpact(
   const p = result.impact.position
   const x = scale.sx(p.x)
   const y = scale.sy(vOf(p, view))
+
+  // The flight-time limit ran out mid-air: mark where the simulation stopped, but
+  // don't pretend it hit anything.
+  if (result.impact.truncated) {
+    ctx.save()
+    ctx.strokeStyle = TRUNCATED_COLOR
+    ctx.lineWidth = 1.5
+    ctx.setLineDash([3, 3])
+    ctx.beginPath()
+    ctx.arc(x, y, 8, 0, Math.PI * 2)
+    ctx.stroke()
+    ctx.setLineDash([])
+    label(
+      ctx,
+      `still airborne at ${Math.round(result.impact.time)} s · flight limit`,
+      x,
+      y - 18,
+      scale,
+      TRUNCATED_COLOR,
+    )
+    ctx.restore()
+    return
+  }
+
   ctx.save()
   ctx.strokeStyle = PALETTE.brassLight
   ctx.lineWidth = 1.5

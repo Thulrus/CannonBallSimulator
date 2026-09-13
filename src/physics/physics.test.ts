@@ -66,6 +66,26 @@ describe('atmosphere', () => {
     }
   })
 
+  it('confines water vapour to the lower atmosphere', () => {
+    // Ground-level humidity must not leak into the stratosphere, where it once made
+    // the thin air count as pure vapour and skewed density by tens of percent.
+    const humid: AtmosphereConfig = { ...std, humidity: 1, temperatureC: 30 }
+    const dry: AtmosphereConfig = { ...std, humidity: 0, temperatureC: 30 }
+    expect(airStateAt(humid, 0).density).toBeLessThan(airStateAt(dry, 0).density)
+    for (const h of [30000, 50000]) {
+      expect(airStateAt(humid, h).density / airStateAt(dry, h).density).toBeCloseTo(1, 3)
+    }
+  })
+
+  it('keeps thinning above the 86 km table top instead of freezing', () => {
+    // Humid air on purpose: vapour pressure once exceeded the near-zero total pressure
+    // up there and left density stuck at a constant floor.
+    const humid: AtmosphereConfig = { ...std, humidity: 0.5 }
+    expect(airStateAt(humid, 100000).density).toBeLessThan(airStateAt(humid, 86000).density / 5)
+    expect(airStateAt(humid, 200000).density).toBeLessThan(airStateAt(humid, 150000).density)
+    expect(airStateAt(humid, 300000).density).toBeLessThan(1e-15)
+  })
+
   it('passes through the measured launch-site conditions', () => {
     const hot: AtmosphereConfig = {
       ...std,
@@ -210,12 +230,41 @@ describe('simulate — impact and sampling', () => {
     expect(mid.position.x).toBeCloseTo((a.position.x + b.position.x) / 2, 9)
   })
 
-  it('warns when the flight is truncated', () => {
+  // Regression: a 19.7 kg shell on a 235 kg charge leaves at 5.7 km/s and stays up
+  // ~527 s — past the 400 s default limit, which used to leave an "impact" mid-air.
+  const lightFastShell: SimulationConfig = {
+    ...DEFAULT_CONFIG,
+    cannon: { elevation: 35, azimuth: 93, barrelLength: 3.08 },
+    projectile: {
+      ...DEFAULT_CONFIG.projectile,
+      mass: 19.7,
+      diameter: 0.0597,
+      dragCoefficient: 0.22,
+      spinRpm: 3200,
+    },
+    propellant: { typeId: 'tripleBase', chargeMass: 235, energyDensity: 4.9e6 },
+    environment: { ...DEFAULT_CONFIG.environment, launchAltitude: 100 },
+    toggles: { drag: true, wind: true, magnus: true, coriolis: true },
+  }
+
+  it('extends the flight-time limit so long flights still reach the ground', () => {
+    const r = simulate(lightFastShell)
+    expect(r.impact.truncated).toBe(false)
+    expect(r.impact.position.y).toBe(0)
+    expect(r.summary.timeOfFlight).toBeGreaterThan(DEFAULT_CONFIG.integration.maxFlightTime)
+  })
+
+  it('flags a flight that outlasts every limit instead of inventing an impact', () => {
+    // The same shell on the Moon with no air: a ~5,000 s lob, beyond the one-hour cap.
     const r = simulate({
-      ...DEFAULT_CONFIG,
-      integration: { ...DEFAULT_CONFIG.integration, maxFlightTime: 1 },
+      ...lightFastShell,
+      environment: { ...lightFastShell.environment, gravity: 1.62 },
+      toggles: { drag: false, wind: false, magnus: false, coriolis: false },
+      integration: { timestep: 0.05, sampleInterval: 1, maxFlightTime: 10 },
     })
-    expect(r.warnings.length).toBeGreaterThan(0)
+    expect(r.impact.truncated).toBe(true)
+    expect(r.impact.position.y).toBeGreaterThan(0)
+    expect(r.warnings.some((w) => w.includes('airborne'))).toBe(true)
   })
 })
 
