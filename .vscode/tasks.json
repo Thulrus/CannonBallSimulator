@@ -1,0 +1,115 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "Dev: Start dev server",
+      "detail": "Vite dev server with hot reload on http://localhost:5173",
+      "type": "npm",
+      "script": "dev",
+      "isBackground": true,
+      "group": { "kind": "build", "isDefault": true },
+      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "problemMatcher": {
+        "owner": "vite",
+        "pattern": { "regexp": "^x^" },
+        "background": {
+          "activeBegins": true,
+          "beginsPattern": "VITE v",
+          "endsPattern": "Local:"
+        }
+      }
+    },
+    {
+      "label": "Build: Production bundle",
+      "detail": "Typecheck and build to dist/",
+      "type": "npm",
+      "script": "build",
+      "group": "build",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "Build: Preview production bundle",
+      "detail": "Serve dist/ locally (run the build task first)",
+      "type": "npm",
+      "script": "preview",
+      "isBackground": true,
+      "dependsOn": "Build: Production bundle",
+      "presentation": { "panel": "dedicated" },
+      "problemMatcher": {
+        "owner": "vite-preview",
+        "pattern": { "regexp": "^x^" },
+        "background": { "activeBegins": true, "beginsPattern": ".", "endsPattern": "Local:" }
+      }
+    },
+    {
+      "label": "Test: Run physics tests",
+      "detail": "Vitest, single run",
+      "type": "npm",
+      "script": "test",
+      "group": { "kind": "test", "isDefault": true },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Watch mode",
+      "detail": "Re-run tests on every save",
+      "type": "npm",
+      "script": "test:watch",
+      "isBackground": true,
+      "group": "test",
+      "presentation": { "panel": "dedicated" },
+      "problemMatcher": []
+    },
+    {
+      "label": "Test: Coverage report",
+      "detail": "Physics coverage; HTML report in coverage/",
+      "type": "npm",
+      "script": "test:coverage",
+      "group": "test",
+      "problemMatcher": []
+    },
+    {
+      "label": "Check: Typecheck",
+      "type": "npm",
+      "script": "typecheck",
+      "problemMatcher": ["$tsc"]
+    },
+    {
+      "label": "Check: Lint",
+      "type": "npm",
+      "script": "lint",
+      "problemMatcher": []
+    },
+    {
+      "label": "Check: Format check",
+      "type": "npm",
+      "script": "format:check",
+      "problemMatcher": []
+    },
+    {
+      "label": "Check: All (pre-push)",
+      "detail": "Typecheck, lint, format check, tests and build — the same gates as CI",
+      "dependsOrder": "sequence",
+      "dependsOn": [
+        "Check: Typecheck",
+        "Check: Lint",
+        "Check: Format check",
+        "Test: Run physics tests",
+        "Build: Production bundle"
+      ],
+      "problemMatcher": []
+    },
+    {
+      "label": "Fix: Format all files",
+      "type": "npm",
+      "script": "format",
+      "problemMatcher": []
+    },
+    {
+      "label": "Setup: Install dependencies",
+      "detail": "Clean install from package-lock.json",
+      "type": "shell",
+      "command": "npm ci",
+      "problemMatcher": []
+    }
+  ]
+}

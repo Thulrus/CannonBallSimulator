@@ -1,0 +1,7 @@
+{
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "editor.formatOnSave": true,
+  "typescript.tsdk": "node_modules/typescript/lib",
+  "files.associations": { "*.css": "tailwindcss" },
+  "search.exclude": { "dist": true, "coverage": true, "package-lock.json": true }
+}
