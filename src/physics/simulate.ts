@@ -197,7 +197,26 @@ export function launchVelocity(speed: number, elevationDeg: number): Vec3 {
  * the two steps that straddle the ground rather than snapped to whichever step
  * happened to land below zero.
  */
-export function simulate(config: SimulationConfig): SimulationResult {
+export interface SimulateOptions {
+  /**
+   * Called every few thousand integration steps with an estimated completion fraction
+   * in [0, 1). The estimate uses the vacuum flight time, so a draggy shot finishes
+   * "early" and jumps to done — good enough for a progress bar.
+   */
+  onProgress?: (fraction: number) => void
+}
+
+/** Upper bound (approximately) on samples recorded per flight. */
+export const MAX_RECORDED_SAMPLES = 4000
+
+/** Integration steps between progress callbacks. */
+const PROGRESS_EVERY = 4096
+
+export function simulate(
+  config: SimulationConfig,
+  options: SimulateOptions = {},
+): SimulationResult {
+  const { onProgress } = options
   const warnings: string[] = []
   const world = buildWorld(config)
   const { projectile } = config
@@ -232,7 +251,15 @@ export function simulate(config: SimulationConfig): SimulationResult {
     config.integration.maxFlightTime,
     Math.min(vacuum.timeOfFlight * 2.5, AUTO_FLIGHT_TIME_CAP),
   )
-  const sampleInterval = Math.max(config.integration.sampleInterval, dt)
+  // Cap the recorded series for long flights. Every sample is copied out of the Web
+  // Worker and walked by React, and a 9-minute flight at 20 ms spacing produced 26,000
+  // of them — enough to stall the page for seconds. The canvas and charts thin to a
+  // couple of thousand points anyway, so spacing samples out loses nothing visible.
+  const sampleInterval = Math.max(
+    config.integration.sampleInterval,
+    dt,
+    Math.min(maxT, vacuum.timeOfFlight) / MAX_RECORDED_SAMPLES,
+  )
 
   let state: State = {
     position: ZERO,
@@ -247,12 +274,17 @@ export function simulate(config: SimulationConfig): SimulationResult {
   let impact: ImpactInfo | null = null
   let prev = state
   let prevT = 0
+  let steps = 0
+  const expectedDuration = Math.max(Math.min(maxT, vacuum.timeOfFlight), dt)
 
   while (t < maxT) {
     prev = state
     prevT = t
     state = rk4Step(t, state, dt, accel)
     t += dt
+    if (onProgress && ++steps % PROGRESS_EVERY === 0) {
+      onProgress(Math.min(t / expectedDuration, 0.99))
+    }
 
     // The shot has crossed the ground plane somewhere inside this step.
     if (state.position.y <= 0 && t > dt) {
@@ -500,3 +532,40 @@ export const relativeAirflow = (sample: Sample, wind: Vec3): Vec3 => sub(sample.
 
 const mix = (a: number, b: number, t: number) => a + (b - a) * t
 const clamp = (v: number, lo: number, hi: number) => Math.min(Math.max(v, lo), hi)
+
+export interface ShotResult {
+  result: SimulationResult
+  /** The same shot without wind, Magnus or Coriolis — the still-air aim point. */
+  aim: SimulationResult | null
+}
+
+/** Whether anything in the configuration pushes the shot off its still-air path. */
+export function hasLateralEffects(config: SimulationConfig): boolean {
+  return (
+    (config.toggles.wind && config.environment.wind.speed > 0) ||
+    (config.toggles.magnus && config.projectile.spinRpm > 0) ||
+    config.toggles.coriolis
+  )
+}
+
+/**
+ * Everything the UI needs for one configuration: the flight itself plus, when wind,
+ * spin or Earth rotation are active, the still-air reference used by the impact map.
+ * Progress covers both runs, ending at exactly 1.
+ */
+export function simulateShot(
+  config: SimulationConfig,
+  onProgress?: (fraction: number) => void,
+): ShotResult {
+  const lateral = hasLateralEffects(config)
+  const split = lateral ? 0.6 : 1
+  const result = simulate(config, { onProgress: onProgress && ((p) => onProgress(p * split)) })
+  const aim = lateral
+    ? simulate(
+        { ...config, toggles: { ...config.toggles, wind: false, magnus: false, coriolis: false } },
+        { onProgress: onProgress && ((p) => onProgress(split + p * (1 - split))) },
+      )
+    : null
+  onProgress?.(1)
+  return { result, aim }
+}

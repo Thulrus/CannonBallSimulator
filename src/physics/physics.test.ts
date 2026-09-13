@@ -5,7 +5,13 @@ import { barrelEfficiency, muzzleVelocity, OPTIMAL_CALIBRES } from './ballistics
 import { toCsv } from './csv'
 import { windVector } from './forces'
 import { rk4Step } from './integrator'
-import { sampleAt, simulate, type SimulationConfig } from './simulate'
+import {
+  MAX_RECORDED_SAMPLES,
+  sampleAt,
+  simulate,
+  simulateShot,
+  type SimulationConfig,
+} from './simulate'
 import { runSweep } from './sweep'
 import { cross, vec } from './vec3'
 
@@ -284,5 +290,55 @@ describe('csv export', () => {
     const columnRow = lines.findIndex((l) => l.startsWith('t_s,'))
     expect(columnRow).toBeGreaterThan(0)
     expect(lines.length - columnRow - 1).toBe(r.samples.length)
+  })
+})
+
+describe('sample budget', () => {
+  it('caps recorded samples on very long flights', () => {
+    // ~9-minute flight: 20 ms spacing would record ~26,000 samples.
+    const r = simulate({
+      ...DEFAULT_CONFIG,
+      cannon: { elevation: 35, azimuth: 93, barrelLength: 3.08 },
+      projectile: {
+        ...DEFAULT_CONFIG.projectile,
+        mass: 19.7,
+        diameter: 0.0597,
+        dragCoefficient: 0.22,
+      },
+      propellant: { typeId: 'tripleBase', chargeMass: 235, energyDensity: 4.9e6 },
+    })
+    expect(r.samples.length).toBeLessThanOrEqual(MAX_RECORDED_SAMPLES + 2)
+    expect(r.impact.position.y).toBe(0)
+  })
+
+  it('keeps the configured spacing for ordinary shots', () => {
+    const r = simulate(DEFAULT_CONFIG)
+    expect(r.samples[2].t - r.samples[1].t).toBeCloseTo(
+      DEFAULT_CONFIG.integration.sampleInterval,
+      6,
+    )
+  })
+})
+
+describe('progress reporting', () => {
+  it('reports rising progress across the shot and aim runs, ending at exactly 1', () => {
+    const seen: number[] = []
+    const { aim } = simulateShot(DEFAULT_CONFIG, (p) => seen.push(p))
+    expect(aim).not.toBeNull()
+    expect(seen.length).toBeGreaterThan(2)
+    for (let i = 1; i < seen.length; i++) expect(seen[i]).toBeGreaterThanOrEqual(seen[i - 1])
+    expect(Math.max(...seen)).toBeLessThanOrEqual(1)
+    expect(seen[seen.length - 1]).toBe(1)
+  })
+
+  it('skips the aim run when nothing pushes the shot sideways', () => {
+    const still = { ...DEFAULT_CONFIG, toggles: { ...DEFAULT_CONFIG.toggles, wind: false } }
+    expect(simulateShot(still).aim).toBeNull()
+  })
+
+  it('gives identical results with and without a progress callback', () => {
+    const plain = simulate(DEFAULT_CONFIG)
+    const tracked = simulate(DEFAULT_CONFIG, { onProgress: () => {} })
+    expect(tracked.summary).toEqual(plain.summary)
   })
 })

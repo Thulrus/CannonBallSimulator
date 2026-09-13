@@ -90,8 +90,8 @@ src/
     csv.ts             Time-series export
     physics.test.ts    Analytic-parabola, energy-conservation and force-direction tests
   data/              Presets: cannons, propellants, projectile shapes, defaults
-  workers/           Sweep Web Worker
-  lib/               Units, playback clock, share links, colours
+  workers/           Simulation and sweep Web Workers (keep the UI responsive)
+  lib/               Units, playback clock, share links, colours, useSimulation hook
   components/
     ControlPanel/      Grouped, collapsible inputs
     TrajectoryCanvas/  Canvas renderer, scales, particles

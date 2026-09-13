@@ -1,6 +1,7 @@
-import { useCallback, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ControlPanel } from './components/ControlPanel/ControlPanel'
 import { DataPanel } from './components/DataPanel/DataPanel'
+import { CalculatingBadge, CalculatingBar } from './components/Flight/Calculating'
 import { ImpactMap } from './components/Flight/ImpactMap'
 import { LiveReadout } from './components/Flight/LiveReadout'
 import { PlaybackBar } from './components/Flight/PlaybackBar'
@@ -16,7 +17,9 @@ import type { PinnedShot } from './lib/misc'
 import { playback } from './lib/playback'
 import { configFromLocation, encodeConfig } from './lib/share'
 import type { UnitSystem } from './lib/units'
-import { simulate, type SimulationConfig } from './physics/simulate'
+import { useDelayedFlag } from './lib/useDelayedFlag'
+import { useSimulation } from './lib/useSimulation'
+import type { SimulationConfig } from './physics/simulate'
 
 const UNITS_KEY = 'cannonball.units'
 
@@ -47,25 +50,10 @@ export default function App() {
     setPresetId(null)
   }, [])
 
-  // Slider drags can outpace the integrator on long flights; let React drop
-  // intermediate configs rather than queueing every one.
-  const deferred = useDeferredValue(config)
-  const result = useMemo(() => simulate(deferred), [deferred])
-
-  const hasLateral =
-    (deferred.toggles.wind && deferred.environment.wind.speed > 0) ||
-    (deferred.toggles.magnus && deferred.projectile.spinRpm > 0) ||
-    deferred.toggles.coriolis
-  const aim = useMemo(
-    () =>
-      hasLateral
-        ? simulate({
-            ...deferred,
-            toggles: { ...deferred.toggles, wind: false, magnus: false, coriolis: false },
-          })
-        : null,
-    [deferred, hasLateral],
-  )
+  // Flights run in a Web Worker so the page never freezes. `result` is the latest
+  // finished calculation and briefly lags behind `config` while `busy`.
+  const { result, aim, busy, progress } = useSimulation(config)
+  const calculating = useDelayedFlag(busy, 150)
 
   // Guard against StrictMode's double effect run: re-loading the same result would
   // park the playhead and cancel the flight that was just fired.
@@ -182,6 +170,7 @@ export default function App() {
   return (
     <div className="flex min-h-screen flex-col xl:h-screen">
       <header className="sticky top-0 z-30 flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-ink-800 bg-ink-950/85 px-4 py-2.5 backdrop-blur-md">
+        <CalculatingBar visible={calculating} progress={progress} />
         <div className="flex items-center gap-3">
           <Logo />
           <div>
@@ -268,6 +257,7 @@ export default function App() {
 
             <div className="relative h-[52vh] min-h-[320px] xl:h-auto xl:flex-1">
               <TrajectoryCanvas result={result} shots={overlays} options={viewOptions} />
+              <CalculatingBadge visible={calculating} progress={progress} />
               {showForces && (
                 <div className="pointer-events-none absolute top-[62px] right-[26px] hidden sm:flex flex-wrap gap-x-3 gap-y-1 rounded-md bg-ink-950/70 px-2 py-1 text-[10.5px] text-ink-300 backdrop-blur-sm">
                   {activeForces
@@ -285,7 +275,9 @@ export default function App() {
             <PlaybackBar onFire={fire} />
           </div>
 
-          <div className="grid items-start gap-3 2xl:grid-cols-[minmax(0,1fr)_17rem]">
+          <div
+            className={`grid items-start gap-3 transition-opacity duration-300 2xl:grid-cols-[minmax(0,1fr)_17rem] ${calculating ? 'opacity-60' : ''}`}
+          >
             <LiveReadout result={result} units={units} />
             <ImpactMap result={result} aim={aim} shots={shots} units={units} />
           </div>
@@ -293,10 +285,10 @@ export default function App() {
 
         <aside
           aria-label="Results"
-          className="border-t border-ink-800 bg-ink-950 lg:col-span-2 xl:col-span-1 xl:min-h-0 xl:border-t-0 xl:border-l"
+          className={`border-t border-ink-800 bg-ink-950 lg:col-span-2 xl:col-span-1 xl:min-h-0 xl:border-t-0 xl:border-l transition-opacity duration-300 ${calculating ? 'opacity-60' : ''}`}
         >
           <DataPanel
-            config={deferred}
+            config={result.config}
             result={result}
             aim={aim}
             units={units}
