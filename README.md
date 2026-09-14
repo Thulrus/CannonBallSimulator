@@ -1,5 +1,7 @@
 # Cannonball Trajectory Simulator
 
+**Try it live: https://thulrus.github.io/CannonBallSimulator/**
+
 A physics sandbox for cannon shots. Configure the charge, barrel, projectile and weather, then watch an animated, physically modelled flight with live data showing _why_ the shot lands where it does.
 
 Built from [`cannonball-simulator-spec.md`](cannonball-simulator-spec.md), scoped to a polished 2D experience (no 3D view).
@@ -50,17 +52,19 @@ npm install
 npm run dev        # http://localhost:5173
 ```
 
-| Script                            | What it does                              |
-| --------------------------------- | ----------------------------------------- |
-| `npm run dev`                     | Vite dev server with hot reload           |
-| `npm run build`                   | Typecheck and production build to `dist/` |
-| `npm run preview`                 | Serve the production build                |
-| `npm test`                        | Physics test suite (Vitest)               |
-| `npm run test:watch`              | Tests in watch mode                       |
-| `npm run test:coverage`           | Coverage report for `src/physics`         |
-| `npm run typecheck`               | TypeScript project check                  |
-| `npm run lint`                    | oxlint                                    |
-| `npm run format` / `format:check` | Prettier                                  |
+| Script                            | What it does                                                   |
+| --------------------------------- | -------------------------------------------------------------- |
+| `npm run dev`                     | Vite dev server with hot reload                                |
+| `npm run build`                   | Typecheck and production build to `dist/`                      |
+| `npm run preview`                 | Serve the production build                                     |
+| `npm run build:pages`             | Production build with the GitHub Pages base path               |
+| `npm run preview:pages`           | Serve the Pages build at `localhost:4173/CannonBallSimulator/` |
+| `npm test`                        | Physics test suite (Vitest)                                    |
+| `npm run test:watch`              | Tests in watch mode                                            |
+| `npm run test:coverage`           | Coverage report for `src/physics`                              |
+| `npm run typecheck`               | TypeScript project check                                       |
+| `npm run lint`                    | oxlint                                                         |
+| `npm run format` / `format:check` | Prettier                                                       |
 
 ### VS Code
 
@@ -74,6 +78,20 @@ Open the folder and run **Tasks: Run Task** (or `Ctrl+Shift+B` to start the dev 
 - **Setup** runs a clean install.
 
 `launch.json` has two debug configurations: the app in Chrome and the current test file. Recommended extensions are listed in `.vscode/extensions.json`.
+
+## Deployment
+
+The site is hosted on GitHub Pages. Every push to `main` runs the **Deploy to GitHub Pages** workflow (`.github/workflows/deploy.yml`):
+
+1. Install dependencies and run the test suite. A failing test blocks the deploy.
+2. Build with `npm run build:pages`.
+3. Publish `dist/` to https://thulrus.github.io/CannonBallSimulator/.
+
+You can also re-run a deploy manually from the repository's **Actions** tab.
+
+The build needs the `/CannonBallSimulator/` base path because Pages serves the site from a subfolder rather than the domain root. If the repository is renamed, update the base path in the `build:pages` and `preview:pages` scripts. To check a Pages build locally before pushing, run the **Build: Preview GitHub Pages bundle** VS Code task.
+
+Share links still work on the hosted site, since the configuration lives in the URL hash.
 
 ## Project layout
 

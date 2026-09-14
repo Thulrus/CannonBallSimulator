@@ -7,11 +7,19 @@
       "type": "npm",
       "script": "dev",
       "isBackground": true,
-      "group": { "kind": "build", "isDefault": true },
-      "presentation": { "reveal": "always", "panel": "dedicated" },
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
+      "presentation": {
+        "reveal": "always",
+        "panel": "dedicated"
+      },
       "problemMatcher": {
         "owner": "vite",
-        "pattern": { "regexp": "^x^" },
+        "pattern": {
+          "regexp": "^x^"
+        },
         "background": {
           "activeBegins": true,
           "beginsPattern": "VITE v",
@@ -34,11 +42,40 @@
       "script": "preview",
       "isBackground": true,
       "dependsOn": "Build: Production bundle",
-      "presentation": { "panel": "dedicated" },
+      "presentation": {
+        "panel": "dedicated"
+      },
       "problemMatcher": {
         "owner": "vite-preview",
-        "pattern": { "regexp": "^x^" },
-        "background": { "activeBegins": true, "beginsPattern": ".", "endsPattern": "Local:" }
+        "pattern": {
+          "regexp": "^x^"
+        },
+        "background": {
+          "activeBegins": true,
+          "beginsPattern": ".",
+          "endsPattern": "Local:"
+        }
+      }
+    },
+    {
+      "label": "Build: Preview GitHub Pages bundle",
+      "detail": "Build with the /CannonBallSimulator/ base path and serve it at http://localhost:4173/CannonBallSimulator/",
+      "type": "shell",
+      "command": "npm run build:pages && npm run preview:pages",
+      "isBackground": true,
+      "presentation": {
+        "panel": "dedicated"
+      },
+      "problemMatcher": {
+        "owner": "vite-preview-pages",
+        "pattern": {
+          "regexp": "^x^"
+        },
+        "background": {
+          "activeBegins": true,
+          "beginsPattern": ".",
+          "endsPattern": "Local:"
+        }
       }
     },
     {
@@ -46,7 +83,10 @@
       "detail": "Vitest, single run",
       "type": "npm",
       "script": "test",
-      "group": { "kind": "test", "isDefault": true },
+      "group": {
+        "kind": "test",
+        "isDefault": true
+      },
       "problemMatcher": []
     },
     {
@@ -56,7 +96,9 @@
       "script": "test:watch",
       "isBackground": true,
       "group": "test",
-      "presentation": { "panel": "dedicated" },
+      "presentation": {
+        "panel": "dedicated"
+      },
       "problemMatcher": []
     },
     {
